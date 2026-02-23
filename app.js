@@ -1,63 +1,53 @@
 /* global generateScenario */
 
 const els = {
-  // buttons
   newScenarioBtn: document.getElementById("newScenarioBtn"),
   resetBtn: document.getElementById("resetBtn"),
   checkBtn: document.getElementById("checkBtn"),
 
-  // tabs
   tabProduction: document.getElementById("tabProduction"),
   tabExpenditure: document.getElementById("tabExpenditure"),
   tabIncome: document.getElementById("tabIncome"),
 
-  // panels
   panelProduction: document.getElementById("panelProduction"),
   panelExpenditure: document.getElementById("panelExpenditure"),
   panelIncome: document.getElementById("panelIncome"),
 
-  // pool
   pool: document.getElementById("pool"),
 
-  // totals
   gdpProd: document.getElementById("gdpProd"),
   gdpExp: document.getElementById("gdpExp"),
   gdpInc: document.getElementById("gdpInc"),
   gapVal: document.getElementById("gapVal"),
 
-  // status / feedback
   status: document.getElementById("status"),
   inventoryFeedback: document.getElementById("inventoryFeedback")
 };
 
 const BIN_IDS = {
-  production: ["P_S_OUT","P_S_INT","P_A_OUT","P_A_INT","P_P_OUT","P_P_INT"],
+  production: ["P_S_OUT","P_S_INT","P_A_OUT","P_A_INT","P_P_OUT","P_P_INT","P_M_OUT","P_M_INT"],
   expenditure: ["E_C","E_I","E_G","E_X","E_M","E_XCL"],
   income: ["I_W","I_P","I_XCL"]
 };
 
 let activeTab = "production";
 let scenario = null;
-
-// placements stored per tab: {tab: {cardId: binId}}
-let placements = {
-  production: {},
-  expenditure: {},
-  income: {}
-};
-
+let placements = { production:{}, expenditure:{}, income:{} };
 let draggedId = null;
 
-function setStatus(msg) {
-  els.status.textContent = msg;
+function setStatus(msg){ els.status.textContent = msg; }
+function money(x){ return `$${x.toFixed(0)}m`; }
+
+function shuffle(arr){
+  const a = arr.slice();
+  for (let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
 }
 
-function money(x) {
-  return `$${x.toFixed(0)}m`;
-}
-
-function clearBins() {
-  // pool + all bins
+function clearBins(){
   els.pool.innerHTML = "";
   for (const tab of Object.keys(BIN_IDS)) {
     for (const binId of BIN_IDS[tab]) {
@@ -67,7 +57,7 @@ function clearBins() {
   }
 }
 
-function makeCard(card) {
+function makeCard(card){
   const div = document.createElement("div");
   div.className = "card";
   div.draggable = true;
@@ -77,9 +67,7 @@ function makeCard(card) {
   div.dataset.ledger = card.ledger;
 
   div.innerHTML = `
-    <div class="top">
-      <span class="money">${money(card.amount)}</span>
-    </div>
+    <div class="top"><span class="money">${money(card.amount)}</span></div>
     <div class="desc">${card.text}</div>
     <div class="feedback"></div>
   `;
@@ -93,17 +81,13 @@ function makeCard(card) {
   return div;
 }
 
-function setupDropzone(zone) {
+function setupDropzone(zone){
   zone.addEventListener("dragover", (e) => {
     e.preventDefault();
     zone.classList.add("dragover");
     e.dataTransfer.dropEffect = "move";
   });
-
-  zone.addEventListener("dragleave", () => {
-    zone.classList.remove("dragover");
-  });
-
+  zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
   zone.addEventListener("drop", (e) => {
     e.preventDefault();
     zone.classList.remove("dragover");
@@ -114,16 +98,11 @@ function setupDropzone(zone) {
     const cardEl = document.getElementById(`card_${id}`);
     if (!cardEl) return;
 
-    // Only allow moving cards belonging to active tab’s ledger
-    const ledger = cardEl.dataset.ledger;
-    if (ledger !== activeTab) return;
+    if (cardEl.dataset.ledger !== activeTab) return;
 
     zone.appendChild(cardEl);
+    placements[activeTab][id] = zone.dataset.bin;
 
-    const bin = zone.dataset.bin;
-    placements[activeTab][id] = bin;
-
-    // clear feedback styling on move
     cardEl.classList.remove("good","bad");
     const fb = cardEl.querySelector(".feedback");
     if (fb) fb.textContent = "";
@@ -132,47 +111,47 @@ function setupDropzone(zone) {
   });
 }
 
-function initDnD() {
-  setupDropzone(els.pool);
+function initDnD(){
   document.querySelectorAll(".dropzone").forEach(setupDropzone);
 }
 
-function setActiveTab(tab) {
+function setActiveTab(tab){
   activeTab = tab;
 
-  // tab buttons
   [els.tabProduction, els.tabExpenditure, els.tabIncome].forEach(btn => btn.classList.remove("active"));
   document.querySelectorAll(".tab").forEach(btn => btn.setAttribute("aria-selected","false"));
   const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
   btn.classList.add("active");
   btn.setAttribute("aria-selected","true");
 
-  // panels
   els.panelProduction.classList.toggle("hidden", tab !== "production");
   els.panelExpenditure.classList.toggle("hidden", tab !== "expenditure");
   els.panelIncome.classList.toggle("hidden", tab !== "income");
 
   renderTabPool();
-  setStatus(`Active ledger: ${tab}. Drag items into the bins for this ledger.`);
+  setStatus(`Active ledger: ${tab}.`);
 }
 
-function renderTabPool() {
-  // Move all cards for this tab back to pool, then re-place according to placements
+function ledgerCards(){
+  return activeTab === "production" ? scenario.productionCards
+       : activeTab === "expenditure" ? scenario.expenditureCards
+       : scenario.incomeCards;
+}
+
+function renderTabPool(){
   els.pool.innerHTML = "";
 
-  // Gather the cards for this ledger
-  const cards =
-    activeTab === "production" ? scenario.productionCards :
-    activeTab === "expenditure" ? scenario.expenditureCards :
-    scenario.incomeCards;
+  // Ensure all cards exist in DOM
+  const cards = ledgerCards();
+  const order = shuffle(cards.map(c => c.id)); // SHUFFLED pool order each time
 
-  // First put all in pool
-  for (const c of cards) {
+  for (const id of order) {
+    const c = cards.find(x => x.id === id);
     const el = document.getElementById(`card_${c.id}`) || makeCard(c);
     els.pool.appendChild(el);
   }
 
-  // Then move any placed cards into their bins
+  // Apply placements for active ledger
   for (const [cid, binId] of Object.entries(placements[activeTab])) {
     const el = document.getElementById(`card_${cid}`);
     const bin = document.querySelector(`[data-bin="${binId}"]`);
@@ -180,75 +159,55 @@ function renderTabPool() {
   }
 }
 
-function resetAllPlacements() {
+function resetAllPlacements(){
   placements = { production:{}, expenditure:{}, income:{} };
 }
 
-function computeGDPProduction() {
-  // GDP = sum over firms (Output - Intermediate)
-  // We compute based on student placements within production bins.
-  const sumBin = (binId) => {
-    const bin = document.querySelector(`[data-bin="${binId}"]`);
-    if (!bin) return 0;
-    let s = 0;
-    bin.querySelectorAll(".card").forEach(c => { s += Number(c.dataset.amount); });
-    return s;
-  };
+function sumBin(binId){
+  const bin = document.querySelector(`[data-bin="${binId}"]`);
+  if (!bin) return 0;
+  let s = 0;
+  bin.querySelectorAll(".card").forEach(c => { s += Number(c.dataset.amount); });
+  return s;
+}
 
+function computeGDPProduction(){
   const steelVA = sumBin("P_S_OUT") - sumBin("P_S_INT");
   const autoVA  = sumBin("P_A_OUT") - sumBin("P_A_INT");
   const portVA  = sumBin("P_P_OUT") - sumBin("P_P_INT");
-
-  return steelVA + autoVA + portVA;
+  const machVA  = sumBin("P_M_OUT") - sumBin("P_M_INT");
+  return steelVA + autoVA + portVA + machVA;
 }
 
-function computeGDPExpenditure() {
-  const sumBin = (binId) => {
-    const bin = document.querySelector(`[data-bin="${binId}"]`);
-    if (!bin) return 0;
-    let s = 0;
-    bin.querySelectorAll(".card").forEach(c => { s += Number(c.dataset.amount); });
-    return s;
-  };
-
+function computeGDPExpenditure(){
   const C = sumBin("E_C");
   const I = sumBin("E_I");
   const G = sumBin("E_G");
   const X = sumBin("E_X");
   const M = sumBin("E_M");
-
   return C + I + G + (X - M);
 }
 
-function computeGDPIncome() {
-  const sumBin = (binId) => {
-    const bin = document.querySelector(`[data-bin="${binId}"]`);
-    if (!bin) return 0;
-    let s = 0;
-    bin.querySelectorAll(".card").forEach(c => { s += Number(c.dataset.amount); });
-    return s;
-  };
-
+function computeGDPIncome(){
   const W = sumBin("I_W");
   const P = sumBin("I_P");
   return W + P;
 }
 
-function updateTotals() {
-  // We compute totals from current DOM bins (all tabs), regardless of activeTab.
+function updateTotals(){
   const gdpP = computeGDPProduction();
   const gdpE = computeGDPExpenditure();
   const gdpI = computeGDPIncome();
 
-  els.gdpProd.textContent = isFinite(gdpP) ? money(gdpP) : "—";
-  els.gdpExp.textContent  = isFinite(gdpE) ? money(gdpE) : "—";
-  els.gdpInc.textContent  = isFinite(gdpI) ? money(gdpI) : "—";
+  els.gdpProd.textContent = money(gdpP);
+  els.gdpExp.textContent  = money(gdpE);
+  els.gdpInc.textContent  = money(gdpI);
 
-  const gap = Math.max(Math.abs(gdpP - gdpE), Math.abs(gdpP - gdpI), Math.abs(gdpE - gdpI));
-  els.gapVal.textContent = isFinite(gap) ? money(gap) : "—";
+  const gap = Math.max(Math.abs(gdpP-gdpE), Math.abs(gdpP-gdpI), Math.abs(gdpE-gdpI));
+  els.gapVal.textContent = money(gap);
 }
 
-function clearFeedbackStyles() {
+function clearFeedbackStyles(){
   document.querySelectorAll(".card").forEach(c => {
     c.classList.remove("good","bad");
     const fb = c.querySelector(".feedback");
@@ -257,108 +216,79 @@ function clearFeedbackStyles() {
   els.inventoryFeedback.textContent = "";
 }
 
-function checkAnswers() {
+function checkAnswers(){
   clearFeedbackStyles();
 
-  // For each ledger, check each card placement against correctBin.
-  const allCards = [
-    ...scenario.productionCards,
-    ...scenario.expenditureCards,
-    ...scenario.incomeCards
-  ];
-
+  const allCards = [...scenario.productionCards, ...scenario.expenditureCards, ...scenario.incomeCards];
   let correct = 0;
-  let totalPlaced = 0;
+  let placed = 0;
 
-  for (const c of allCards) {
+  for (const c of allCards){
     const el = document.getElementById(`card_${c.id}`);
     if (!el) continue;
 
     const tab = c.ledger;
-    const placedBin = placements[tab][c.id];
+    const bin = placements[tab][c.id];
+    if (!bin) continue;
 
-    if (!placedBin) continue; // not placed
-    totalPlaced++;
-
-    if (placedBin === c.correctBin) {
+    placed++;
+    if (bin === c.correctBin){
       correct++;
       el.classList.add("good");
       el.querySelector(".feedback").textContent = "✓";
     } else {
       el.classList.add("bad");
-      el.querySelector(".feedback").textContent = `✗`;
+      el.querySelector(".feedback").textContent = "✗";
     }
   }
 
-  // Inventory-specific feedback: make sure inventory item is in Investment (E_I)
-  const invCard = scenario.expenditureCards.find(x => x.text.toLowerCase().includes("inventor"));
-  if (invCard) {
-    const placed = placements.expenditure[invCard.id];
-    if (placed === "E_I") {
-      els.inventoryFeedback.textContent =
-        "Inventory check: ✓ Inventory investment was correctly classified inside Investment (I).";
-    } else if (placed) {
-      els.inventoryFeedback.textContent =
-        "Inventory check: ✗ Inventory investment should be placed in Investment (I), not in another category.";
-    } else {
-      els.inventoryFeedback.textContent =
-        "Inventory check: Place the inventory change item. It belongs in Investment (I).";
-    }
+  // Inventory check: any card flagged inventoryInvestment must be in E_I
+  const invIds = scenario.meta.inventoryCardIds || [];
+  if (invIds.length){
+    const ok = invIds.every(id => placements.expenditure[id] === "E_I");
+    els.inventoryFeedback.textContent = ok
+      ? "Inventory check: ✓ Inventory investment is correctly placed inside Investment (I)."
+      : "Inventory check: ✗ At least one inventory-change item is not in Investment (I).";
   }
 
   updateTotals();
 
-  // Win condition hint
-  const gdpP = computeGDPProduction();
-  const gdpE = computeGDPExpenditure();
-  const gdpI = computeGDPIncome();
-  const gap = Math.max(Math.abs(gdpP - gdpE), Math.abs(gdpP - gdpI), Math.abs(gdpE - gdpI));
+  const gap = Math.max(
+    Math.abs(computeGDPProduction() - computeGDPExpenditure()),
+    Math.abs(computeGDPProduction() - computeGDPIncome()),
+    Math.abs(computeGDPExpenditure() - computeGDPIncome())
+  );
 
-  if (totalPlaced === 0) {
-    setStatus("Place items in the bins, then click Check.");
-  } else if (gap < 0.5) {
-    setStatus(`Nice. Your three GDP totals reconcile (gap ≈ ${money(gap)}).`);
-  } else {
-    setStatus(`Checked: ${correct}/${totalPlaced} items correctly placed. Reconciliation gap: ${money(gap)}.`);
-  }
+  if (placed === 0) setStatus("Place items in bins, then click Check.");
+  else if (gap < 1e-6) setStatus(`Perfect. GDP totals reconcile exactly (gap = ${money(gap)}).`);
+  else setStatus(`Checked: ${correct}/${placed} correct. Gap: ${money(gap)}.`);
 }
 
-function newScenario() {
+function newScenario(){
   scenario = generateScenario();
   resetAllPlacements();
   clearBins();
 
-  // Create all card elements once; they will move between pool/bins as we switch tabs.
-  const allCards = [
-    ...scenario.productionCards,
-    ...scenario.expenditureCards,
-    ...scenario.incomeCards
-  ];
-  for (const c of allCards) {
-    if (!document.getElementById(`card_${c.id}`)) {
-      // create but don't attach yet
-      makeCard(c);
-    }
+  // Create all card DOM nodes once
+  for (const c of [...scenario.productionCards, ...scenario.expenditureCards, ...scenario.incomeCards]) {
+    if (!document.getElementById(`card_${c.id}`)) makeCard(c);
   }
 
-  // Render the pool for the active tab
   renderTabPool();
   clearFeedbackStyles();
   updateTotals();
-
-  setStatus("New round loaded. Start with any tab—then make all three GDP totals match.");
+  setStatus("New round loaded. Make all three GDP totals match.");
 }
 
-function resetRound() {
+function resetRound(){
   resetAllPlacements();
-  // move cards of active tab back to pool
   renderTabPool();
   clearFeedbackStyles();
   updateTotals();
-  setStatus("Reset placements (current round).");
+  setStatus("Reset placements (this round).");
 }
 
-function init() {
+function init(){
   initDnD();
 
   els.tabProduction.addEventListener("click", () => setActiveTab("production"));
@@ -369,7 +299,6 @@ function init() {
   els.resetBtn.addEventListener("click", resetRound);
   els.checkBtn.addEventListener("click", checkAnswers);
 
-  // start
   setActiveTab("production");
   newScenario();
 }
