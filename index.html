@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GDP Reconciliation Lab: Production = Expenditure = Income</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- MathJax for formulas -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)'], ['$', '$']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+</head>
+
+<body>
+  <header class="page-header">
+    <div class="container header-inner">
+      <div class="title-block">
+        <div class="kicker">Macroeconomics Practice Lab</div>
+        <h1>GDP Reconciliation Lab</h1>
+        <p class="sub">
+          Classify the items in three different ledgers. When you do it correctly, the three totals match:
+          <strong>Production (Value Added)</strong> = <strong>Expenditure</strong> = <strong>Income</strong>.
+          This lab includes <strong>G</strong>, <strong>NX</strong>, and <strong>inventory investment inside I</strong>.
+        </p>
+
+        <details class="howto">
+          <summary>Key identities</summary>
+          <div class="howto-body">
+            <ul>
+              <li><strong>Expenditure approach</strong>: \(\;GDP = C + I + G + (X-M)\)</li>
+              <li><strong>Inventory investment</strong>: \(\;I = I_{\text{fixed}} + \Delta \text{Inventories}\)</li>
+              <li><strong>Production approach</strong>: \(\;GDP = \sum \text{Value Added} = \sum (\text{Output} - \text{Intermediate Inputs})\)</li>
+              <li><strong>Income approach</strong> (simplified): \(\;GDP = \text{Wages} + \text{Profits}\)</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+
+      <div class="controls-card">
+        <div class="controls-top">
+          <div class="control">
+            <label>Scenario</label>
+            <button id="newScenarioBtn" class="btn primary">New Round</button>
+          </div>
+          <div class="control">
+            <label>Actions</label>
+            <div class="controls-actions">
+              <button id="resetBtn" class="btn subtle">Reset</button>
+              <button id="checkBtn" class="btn">Check</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="totals">
+          <div class="metric">
+            <div class="label">GDP (Production)</div>
+            <div id="gdpProd" class="value">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">GDP (Expenditure)</div>
+            <div id="gdpExp" class="value">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">GDP (Income)</div>
+            <div id="gdpInc" class="value">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Reconciliation gap</div>
+            <div id="gapVal" class="value">—</div>
+          </div>
+        </div>
+
+        <div id="status" class="status" aria-live="polite"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container main-grid">
+    <!-- LEFT: cards -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Items</h2>
+        <p class="panel-sub">Drag items into the correct buckets for the selected ledger tab.</p>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Ledger tabs">
+        <button class="tab active" id="tabProduction" data-tab="production" role="tab" aria-selected="true">Production</button>
+        <button class="tab" id="tabExpenditure" data-tab="expenditure" role="tab" aria-selected="false">Expenditure</button>
+        <button class="tab" id="tabIncome" data-tab="income" role="tab" aria-selected="false">Income</button>
+      </div>
+
+      <div id="pool" class="dropzone pool" data-bin="POOL" aria-label="Card pool"></div>
+    </section>
+
+    <!-- RIGHT: bins -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Ledger</h2>
+        <p class="panel-sub">Your classifications determine each GDP total. Make all three match.</p>
+      </div>
+
+      <!-- Production bins -->
+      <div class="tabpanel" id="panelProduction" data-tabpanel="production">
+        <div class="bin-grid wide">
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent gdp"></span><h3>SteelCo: Output</h3></div>
+            <div id="binP_S_OUT" class="dropzone" data-bin="P_S_OUT"></div>
+          </div>
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent neither"></span><h3>SteelCo: Intermediate</h3></div>
+            <div id="binP_S_INT" class="dropzone" data-bin="P_S_INT"></div>
+          </div>
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent gdp"></span><h3>AutoCo: Output</h3></div>
+            <div id="binP_A_OUT" class="dropzone" data-bin="P_A_OUT"></div>
+          </div>
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent neither"></span><h3>AutoCo: Intermediate</h3></div>
+            <div id="binP_A_INT" class="dropzone" data-bin="P_A_INT"></div>
+          </div>
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent gdp"></span><h3>PortCo: Output</h3></div>
+            <div id="binP_P_OUT" class="dropzone" data-bin="P_P_OUT"></div>
+          </div>
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent neither"></span><h3>PortCo: Intermediate</h3></div>
+            <div id="binP_P_INT" class="dropzone" data-bin="P_P_INT"></div>
+          </div>
+        </div>
+
+        <div class="note">
+          Value added is computed as Output − Intermediate for each firm. Summed value added is GDP (Production).
+        </div>
+      </div>
+
+      <!-- Expenditure bins -->
+      <div class="tabpanel hidden" id="panelExpenditure" data-tabpanel="expenditure">
+        <div class="bin-grid">
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent gdp"></span><h3>Consumption (C)</h3></div>
+            <div id="binE_C" class="dropzone" data-bin="E_C"></div>
+          </div>
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent both"></span><h3>Investment (I)</h3></div>
+            <div id="binE_I" class="dropzone" data-bin="E_I"></div>
+            <div class="subnote">Includes fixed investment + \(\Delta\) inventories.</div>
+          </div>
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent gnp"></span><h3>Government (G)</h3></div>
+            <div id="binE_G" class="dropzone" data-bin="E_G"></div>
+          </div>
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent gdp"></span><h3>Exports (X)</h3></div>
+            <div id="binE_X" class="dropzone" data-bin="E_X"></div>
+          </div>
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent neither"></span><h3>Imports (M)</h3></div>
+            <div id="binE_M" class="dropzone" data-bin="E_M"></div>
+          </div>
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent neither"></span><h3>Not in GDP / Intermediate / Transfer</h3></div>
+            <div id="binE_XCL" class="dropzone" data-bin="E_XCL"></div>
+          </div>
+        </div>
+
+        <div class="note">
+          GDP (Expenditure) is computed as \(C + I + G + (X - M)\). Inventory investment belongs inside <strong>I</strong>.
+        </div>
+      </div>
+
+      <!-- Income bins -->
+      <div class="tabpanel hidden" id="panelIncome" data-tabpanel="income">
+        <div class="bin-grid">
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent gnp"></span><h3>Wages</h3></div>
+            <div id="binI_W" class="dropzone" data-bin="I_W"></div>
+          </div>
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent both"></span><h3>Profits</h3></div>
+            <div id="binI_P" class="dropzone" data-bin="I_P"></div>
+          </div>
+          <div class="bin">
+            <div class="bin-title"><span class="bin-accent neither"></span><h3>Not income / Transfer / Financial</h3></div>
+            <div id="binI_XCL" class="dropzone" data-bin="I_XCL"></div>
+          </div>
+        </div>
+
+        <div class="note">
+          This simplified income approach uses Wages + Profits. (No depreciation/taxes here.)
+        </div>
+      </div>
+
+      <div class="results">
+        <div class="results-head">
+          <h2>Inventory checks</h2>
+          <p class="panel-sub">These update when you click “Check”.</p>
+        </div>
+        <div id="inventoryFeedback" class="explain"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="container footer">
+    <div class="footer-inner">
+      <div class="footer-note">Goal: classify items so all three GDP totals match.</div>
+      <div class="footer-note">Inventories are part of Investment (I) in the expenditure approach.</div>
+    </div>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
