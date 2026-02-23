@@ -149,16 +149,18 @@ function generateScenario() {
 
   // Production cards (multiple outputs + multiple intermediate purchases per firm)
   const productionCards = [];
-  const prodOutTemplates = [
-    (name, v) => `${name} records $${v}m of sales revenue for goods/services delivered this year.`,
-    (name, v) => `${name} completes contracts valued at $${v}m at market prices.`,
-    (name, v) => `${name} reports $${v}m in product/service output for the year.`
-  ];
-  const prodIntTemplates = [
-    (name, v) => `${name} purchases $${v}m of inputs used up in production during the year.`,
-    (name, v) => `${name} pays $${v}m for materials/components used as production inputs.`,
-    (name, v) => `${name} buys $${v}m of business-to-business inputs used in production.`
-  ];
+const prodOutTemplates = [
+  (name, v) => `${name} records $${v}m in sales of goods/services produced this year.`,
+  (name, v) => `${name} delivers goods/services valued at $${v}m at market prices.`,
+  (name, v) => `${name} reports $${v}m in output for the year.`,
+  (name, v) => `${name} fulfills customer orders totaling $${v}m.`,
+  (name, v) => `${name} bills $${v}m for products/services it produced this year.`
+];
+const prodIntTemplates = [
+  (name, v) => `${name} purchases $${v}m of materials and services used up during production.`,
+  (name, v) => `${name} buys $${v}m of components/materials used in its production process.`,
+  (name, v) => `${name} pays $${v}m for production inputs (materials, services, energy).`
+];
 
   firmStats.forEach(fs => {
     const outParts = partition(fs.OUT, randInt(2, 4), 3);
